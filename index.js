@@ -17,29 +17,34 @@ let totalDuration = 0;
 
 let userChoice = 0;
 
+
 // Enable raw mode
 process.stdin.setRawMode(true);
 
+
 // Listen for keyboard input
 process.stdin.on("data", (data) => {
+
   // =========================
   // UP / DOWN ARROW
   // =========================
 
   if (data[0] === 0x1b) {
+
     if (data[1] === 0x5b) {
+
       // UP ARROW
-      // 0x41 = Up Arrow
       if (data[2] === 0x41) {
+
         if (userChoice > 0) {
           userChoice -= 1;
 
           getTotalDuration(songMenu[userChoice]);
         }
 
-        // DOWN ARROW
-        // 0x42 = Down Arrow
+      // DOWN ARROW
       } else if (data[2] === 0x42) {
+
         if (userChoice < songMenu.length - 1) {
           userChoice += 1;
 
@@ -51,11 +56,13 @@ process.stdin.on("data", (data) => {
     }
   }
 
+
   // =========================
   // CTRL + C
   // =========================
 
   if (data[0] === 0x03) {
+
     if (playerProcess != undefined) {
       playerProcess.kill("SIGKILL");
     }
@@ -65,12 +72,16 @@ process.stdin.on("data", (data) => {
     process.exit(0);
   }
 
+
   // =========================
   // ENTER
   // =========================
 
   if (data[0] === 0x0d) {
-    console.log("> user selected: " + songMenu[userChoice]);
+
+    console.log(
+      "> user selected: " + songMenu[userChoice]
+    );
 
     // Stop currently playing song
     if (playerProcess != undefined) {
@@ -78,7 +89,14 @@ process.stdin.on("data", (data) => {
     }
 
     // Start VLC
-    playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
+    playerProcess = spawn(
+      "vlc",
+      [
+        "--intf",
+        "rc",
+        songMenu[userChoice]
+      ]
+    );
 
     // Get duration
     getTotalDuration(songMenu[userChoice]);
@@ -88,12 +106,13 @@ process.stdin.on("data", (data) => {
     isPaused = false;
   }
 
+
   // =========================
   // PLAY / PAUSE
   // =========================
 
   if (data[0] === 0x70) {
-    // Don't do anything if no song is playing
+
     if (playerProcess == undefined) {
       console.log("No song is currently playing.");
       return;
@@ -102,21 +121,28 @@ process.stdin.on("data", (data) => {
     // Tell VLC to pause/resume
     playerProcess.stdin.write("pause\n");
 
-    // Keep track of state for our timer
+    // Keep track of state for timer
     isPaused = !isPaused;
 
-    console.log(isPaused ? "Song paused" : "Song resumed");
+    console.log(
+      isPaused
+        ? "Song paused"
+        : "Song resumed"
+    );
   }
+
 
   // =========================
   // NEXT
   // =========================
 
   if (data[0] === 0x6e) {
+
     console.log("next");
 
     // Don't go beyond last song
     if (userChoice >= songMenu.length - 1) {
+
       console.log("Already at the last song.");
 
       return;
@@ -137,7 +163,14 @@ process.stdin.on("data", (data) => {
     getTotalDuration(songMenu[userChoice]);
 
     // Start next song
-    playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
+    playerProcess = spawn(
+      "vlc",
+      [
+        "--intf",
+        "rc",
+        songMenu[userChoice]
+      ]
+    );
 
     // New song starts playing
     isPaused = false;
@@ -147,15 +180,18 @@ process.stdin.on("data", (data) => {
     return;
   }
 
+
   // =========================
   // BACK / PREVIOUS
   // =========================
 
   if (data[0] === 0x62) {
+
     console.log("back");
 
     // Don't go before first song
     if (userChoice <= 0) {
+
       console.log("Already at the first song.");
 
       return;
@@ -176,7 +212,14 @@ process.stdin.on("data", (data) => {
     getTotalDuration(songMenu[userChoice]);
 
     // Start previous song
-    playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
+    playerProcess = spawn(
+      "vlc",
+      [
+        "--intf",
+        "rc",
+        songMenu[userChoice]
+      ]
+    );
 
     // New song starts playing
     isPaused = false;
@@ -187,55 +230,140 @@ process.stdin.on("data", (data) => {
   }
 });
 
+
 // =========================
 // DISPLAY SONG MENU
 // =========================
 
 function listSong() {
+
   // Move cursor to starting position
   process.stdout.write("\x1b[2;0H");
 
+
   songMenu.forEach((song, index) => {
+
     if (index === userChoice) {
-      process.stdout.write(`> ${index + 1}. ${song}\n`);
+
+      process.stdout.write(
+        `> ${index + 1}. ${song}\n`
+      );
+
     } else {
-      process.stdout.write(`  ${index + 1}. ${song}\n`);
+
+      process.stdout.write(
+        `  ${index + 1}. ${song}\n`
+      );
     }
   });
 
+
   console.log(
-    `Elapsed / Total Duration: ${elapsedDuration.toFixed(2)} / ${totalDuration}`,
+    `Elapsed / Total Duration: ${elapsedDuration.toFixed(2)} / ${totalDuration}`
   );
+
+
+  // Display progress bar
+  console.log(progressBar());
 }
+
+
+// =========================
+// PROGRESS BAR
+// =========================
+
+function progressBar() {
+
+  if (totalDuration <= 0) {
+    return "[░░░░░░░░░░░░░░░░░░░░] 0%";
+  }
+
+
+  let percentage =
+    (elapsedDuration / totalDuration) * 100;
+
+
+  // Keep percentage between 0 and 100
+  if (percentage < 0) {
+    percentage = 0;
+  }
+
+  if (percentage > 100) {
+    percentage = 100;
+  }
+
+
+  const totalBars = 20;
+
+
+  const filledBars =
+    Math.floor(
+      (percentage / 100) * totalBars
+    );
+
+
+  const filled =
+    "█".repeat(filledBars);
+
+
+  const empty =
+    "░".repeat(
+      totalBars - filledBars
+    );
+
+
+  return `[${filled}${empty}] ${percentage.toFixed(0)}%`;
+}
+
 
 // =========================
 // GET SONG DURATION
 // =========================
 
 function getTotalDuration(songPath) {
-  console.log("Getting total duration for: " + songPath);
 
-  const afInfoProcess = spawn("afinfo", [songPath]);
+  console.log(
+    "Getting total duration for: " + songPath
+  );
+
+
+  const afInfoProcess = spawn(
+    "afinfo",
+    [songPath]
+  );
+
 
   afInfoProcess.stdout.on("data", (data) => {
+
     const rawoutput = data.toString();
 
-    const duration = rawoutput.split("estimated duration: ")[1];
+
+    const duration =
+      rawoutput.split("estimated duration: ")[1];
+
 
     totalDuration = parseFloat(duration);
   });
 }
+
 
 // =========================
 // UPDATE SCREEN
 // =========================
 
 setInterval(() => {
-  // Refresh song list
+
+  // Refresh song list and progress bar
   listSong();
 
+
   // Increase elapsed time only when playing
-  if (isPaused === false && playerProcess != undefined) {
+  if (
+    isPaused === false &&
+    playerProcess != undefined
+  ) {
+
     elapsedDuration += 0.05;
   }
+
 }, 50);
