@@ -1,4 +1,3 @@
-
 const { spawn } = require("child_process");
 const fs = require("fs");
 
@@ -23,34 +22,27 @@ process.stdin.setRawMode(true);
 
 // Listen for keyboard input
 process.stdin.on("data", (data) => {
-  // console.log(data)
-
   // Arrow keys send ANSI escape sequences starting with 0x1b
   if (data[0] === 0x1b) {
     if (data[1] === 0x5b) {
-
       // UP ARROW BUTTON
       // 0x41 represents the Up Arrow key
       if (data[2] === 0x41) {
         if (userChoice > 0) {
           userChoice -= 1;
-          totalDuration = getTotalDuration(songMenu[userChoice]);
+          getTotalDuration(songMenu[userChoice]);
         }
 
-        // console.log("Up Arrow Key")
-
-      // DOWN ARROW BUTTON
-      // 0x42 represents the Down Arrow key
+        // DOWN ARROW BUTTON
+        // 0x42 represents the Down Arrow key
       } else if (data[2] === 0x42) {
         if (userChoice < songMenu.length - 1) {
           userChoice += 1;
-          totalDuration = getTotalDuration(songMenu[userChoice]);
+          getTotalDuration(songMenu[userChoice]);
         }
-
-        // console.log("Down Arrow Key")
       }
 
-      // Refresh the song list after changing selection
+      // Refresh the song list
       listSong();
     }
   }
@@ -58,7 +50,10 @@ process.stdin.on("data", (data) => {
   // CTRL + C BUTTON
   // 0x03 represents Ctrl + C
   if (data[0] == 0x03) {
-    playerProcess.kill("SIGKILL");
+    if (playerProcess != undefined) {
+      playerProcess.kill("SIGKILL");
+    }
+
     console.log("user pressed Ctrl+C, exiting...");
     process.exit(0);
   }
@@ -66,10 +61,9 @@ process.stdin.on("data", (data) => {
   // ENTER BUTTON
   // 0x0d represents the Enter key
   if (data[0] == 0x0d) {
-    // 0x0d ka matlab hai ki user ne Enter key press kiya hai
     console.log("> user selected:   " + songMenu[userChoice]);
 
-    // Stop the currently playing song before starting a new one
+    // Stop the currently playing song
     if (playerProcess != undefined) {
       playerProcess.kill("SIGKILL");
     }
@@ -77,49 +71,60 @@ process.stdin.on("data", (data) => {
     // Start VLC with the selected song
     playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
 
-    // Get the duration of the selected song
-    totalDuration = getTotalDuration(songMenu[userChoice]);
+    // Reset elapsed duration
+    elapsedDuration = 0;
 
-    // Make sure the new song starts in playing state
+    // Get duration of selected song
+    getTotalDuration(songMenu[userChoice]);
+
+    // New song starts playing
     isPaused = false;
   }
 
   // PLAY / PAUSE BUTTON
   // "p" is used to play or pause the current song
   if (data[0] == 0x70) {
+    // Do nothing if no song is currently running
+    if (playerProcess == undefined) {
+      return;
+    }
+
+    // Send pause command directly to VLC
     playerProcess.stdin.write("pause\n");
 
-    console.log("user pressed Play/Pause button");
-
-    // Toggle between paused and playing state
+    // Toggle our own pause state
     isPaused = !isPaused;
 
-    // SIGSTOP pauses the process and SIGCONT resumes it
-    playerProcess.kill(isPaused ? "SIGSTOP" : "SIGCONT");
+    console.log(isPaused ? "user paused the song" : "user resumed the song");
   }
 
   // NEXT BUTTON
   // "n" is used to move to the next song
   if (data[0] == 0x6e) {
-    console.log("next");
+    // Only move if we are NOT already at the last song
+    if (userChoice < songMenu.length - 1) {
+      console.log("next");
 
-    // Reset elapsed time for the new song
-    elapsedDuration = 0;
+      // Reset elapsed time
+      elapsedDuration = 0;
 
-    // Get duration of the next song
-    totalDuration = getTotalDuration(songMenu[userChoice + 1]);
+      // Move to next song
+      userChoice += 1;
 
-    // Stop the currently playing song
-    playerProcess.kill("SIGINT");
+      // Get duration of next song
+      getTotalDuration(songMenu[userChoice]);
 
-    // Move to the next song
-    userChoice += 1;
+      // Stop currently playing song
+      if (playerProcess != undefined) {
+        playerProcess.kill("SIGINT");
+      }
 
-    // Start the next song using VLC
-    playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
+      // Start next song
+      playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
 
-    // Start the new song in playing state
-    isPaused = false;
+      // New song starts playing
+      isPaused = false;
+    }
 
     return;
   }
@@ -127,51 +132,46 @@ process.stdin.on("data", (data) => {
   // BACK / PREVIOUS BUTTON
   // "b" is used to move to the previous song
   if (data[0] == 0x62) {
-    console.log("back");
+    // Only move if we are NOT already at the first song
+    if (userChoice > 0) {
+      console.log("back");
 
-    // Reset elapsed time for the new song
-    elapsedDuration = 0;
+      // Reset elapsed time
+      elapsedDuration = 0;
 
-    // Get duration of the previous song
-    totalDuration = getTotalDuration(songMenu[userChoice - 1]);
+      // Move to previous song
+      userChoice -= 1;
 
-    // Stop the currently playing song
-    playerProcess.kill("SIGKILL");
+      // Get duration of previous song
+      getTotalDuration(songMenu[userChoice]);
 
-    // Move to the previous song
-    userChoice -= 1;
+      // Stop currently playing song
+      if (playerProcess != undefined) {
+        playerProcess.kill("SIGKILL");
+      }
 
-    // Start the previous song using VLC
-    playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
+      // Start previous song
+      playerProcess = spawn("vlc", ["--intf", "rc", songMenu[userChoice]]);
 
-    // Start the new song in playing state
-    isPaused = false;
+      // New song starts playing
+      isPaused = false;
+    }
 
     return;
   }
 });
 
-
 // Function to display the song menu
 function listSong() {
-  // console.clear();
-  // process.stdout.write('\x1b[2J')
-
   // Move cursor to the starting position of the song list
   process.stdout.write("\x1b[2;0H");
 
   songMenu.forEach((song, index) => {
-
     // Display ">" next to the currently selected song
     if (index === userChoice) {
       process.stdout.write(`> ${index + 1}. ${song}\n`);
-
-      // console.log(`> ${index + 1}. ${song}`);
     } else {
-      // Display other songs without the selection indicator
       process.stdout.write(`  ${index + 1}. ${song}\n`);
-
-      // console.log(`  ${index + 1}. ${song}`);
     }
   });
 
@@ -179,44 +179,67 @@ function listSong() {
   console.log(
     `Elapsed / Total Duration: ${elapsedDuration.toFixed(2)} / ${totalDuration}`,
   );
+
+  // Display progress bar
+  console.log(`Progress: ${progressBar()}`);
 }
 
+// Function to create the progress bar
+function progressBar() {
+  // If duration is not available yet
+  if (totalDuration <= 0) {
+    return "[░░░░░░░░░░░░░░░░░░░░] 0%";
+  }
+
+  // Calculate percentage
+  let percentage = (elapsedDuration / totalDuration) * 100;
+
+  // Don't allow percentage to go above 100
+  if (percentage > 100) {
+    percentage = 100;
+  }
+
+  // Total number of blocks in the progress bar
+  const totalBars = 20;
+
+  // Calculate how many blocks should be filled
+  const filledBars = Math.floor((percentage / 100) * totalBars);
+
+  // Create filled and empty sections
+  const filled = "█".repeat(filledBars);
+  const empty = "░".repeat(totalBars - filledBars);
+
+  // Return the complete progress bar
+  return `[${filled}${empty}] ${percentage.toFixed(0)}%`;
+}
 
 // Function to get the total duration of a song
 function getTotalDuration(songPath) {
-  // Implementation for getting total duration
   console.log("Getting total duration for: " + songPath);
 
-  // Use macOS "afinfo" command to get information about the audio file
+  // Use macOS "afinfo" command
   const afInfoProcess = spawn("afinfo", [songPath]);
 
   afInfoProcess.stdout.on("data", (data) => {
     const rawoutput = data.toString();
 
-    // console.log("afinfo output: " + rawoutput);
+    // Get the part after "estimated duration:"
+    const duration = rawoutput.split("estimated duration: ")[1];
 
-    // Extract the estimated duration from afinfo output
-    totalDuration = Number(
-      rawoutput.split("estimated duration: ")[1].split(".")[0],
-    );
-
-    // const durationMatch = output.match(/estimated duration: (\d+\.\d+)/);
-    // if (durationMatch) {
-    //   totalDuration = parseFloat(durationMatch[1]);
-    //   console.log("Total Duration: " + totalDuration);
-    // }
+    if (duration) {
+      // Convert the duration into a number
+      totalDuration = parseFloat(duration);
+    }
   });
 }
-
 
 // Update the screen and elapsed duration every 50 milliseconds
 setInterval(() => {
   // Refresh the song list
   listSong();
 
-  // Increase elapsed duration only when a song is playing
+  // Increase elapsed time only when a song is playing
   if (isPaused === false && playerProcess != undefined) {
     elapsedDuration += 0.05;
   }
 }, 50);
-
