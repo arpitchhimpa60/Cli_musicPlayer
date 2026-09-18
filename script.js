@@ -301,7 +301,7 @@ function changeVolume(amount) {
     volume = 0;
   }
 
-  if (playerProcess !== undefined) {
+  if (playerProcess !== undefined && playerProcess.stdin.writable) {
     playerProcess.stdin.write(`volume ${volume}\n`);
   }
 
@@ -424,7 +424,7 @@ process.stdin.on("data", (key) => {
 
   // ================= VOLUME UP =================
 
-  if (key === "+") {
+  if (key === "+" || key === "=") {
     changeVolume(10);
 
     return;
