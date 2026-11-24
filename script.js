@@ -145,7 +145,7 @@ function setupScreen() {
 
   console.log("Controls: ↑ ↓ Select | Enter Play | P Pause");
 
-  console.log("N Next | B Back | +/- Volume");
+  console.log("N Next | B Back | R Restart | +/- Volume");
 
   console.log("S Shuffle | Q Quit");
 }
@@ -288,6 +288,33 @@ function previousSong() {
   playerProcess.stdin.write(`volume ${volume}\n`);
 }
 
+// ================= RESTART =================
+
+function restartSong() {
+  if (playerProcess === undefined) {
+    return;
+  }
+
+  playerProcess.kill("SIGKILL");
+
+  playerProcess = undefined;
+
+  elapsedDuration = 0;
+
+  isPaused = false;
+
+  playerProcess = spawn("vlc", [
+    "--intf",
+    "rc",
+    "--quiet",
+    songMenu[userChoice],
+  ]);
+
+  playerProcess.stdin.write(`volume ${volume}\n`);
+
+  updateStatus(`Playing - ${songMenu[userChoice]}`);
+}
+
 // ================= VOLUME =================
 
 function changeVolume(amount) {
@@ -418,6 +445,14 @@ process.stdin.on("data", (key) => {
 
   if (key === "b") {
     previousSong();
+
+    return;
+  }
+
+  // ================= RESTART =================
+
+  if (key === "r") {
+    restartSong();
 
     return;
   }
